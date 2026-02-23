@@ -1,15 +1,12 @@
-version: '3.9'
-
 services:
   # PostgreSQL Database with pgvector extension
   postgres:
-    image: pgvector/pgvector:pg16-latest
+    image: ankane/pgvector:latest
     container_name: sistema-atendimento-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-atendimento}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme123}
       POSTGRES_DB: ${DB_NAME:-pizzaria_db}
-      POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=vector"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
@@ -25,7 +22,7 @@ services:
       - app-network
     restart: unless-stopped
 
-  # Redis Cache (opcional, para sessões e cache)
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: sistema-atendimento-redis
@@ -44,7 +41,7 @@ services:
       - app-network
     restart: unless-stopped
 
-  # Kafka (opcional, com fallback em database_service.py)
+  # Kafka
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: sistema-atendimento-kafka
@@ -70,7 +67,7 @@ services:
       - app-network
     restart: unless-stopped
 
-  # Zookeeper (dependência do Kafka)
+  # Zookeeper
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: sistema-atendimento-zookeeper
@@ -96,17 +93,12 @@ services:
       dockerfile: Dockerfile.backend
     container_name: sistema-atendimento-backend
     environment:
-      # Database
       DATABASE_URL: postgresql://${DB_USER:-atendimento}:${DB_PASSWORD:-changeme123}@postgres:5432/${DB_NAME:-pizzaria_db}
-      # Redis
       REDIS_URL: redis://:${REDIS_PASSWORD:-changeme123}@redis:6379/0
-      # Kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      # API Keys
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      # App Config
       ENVIRONMENT: ${ENVIRONMENT:-production}
       DEBUG: ${DEBUG:-false}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -119,8 +111,6 @@ services:
         condition: service_healthy
     ports:
       - "${BACKEND_PORT:-8000}:8000"
-    volumes:
-      - ./:/app
     networks:
       - app-network
     restart: unless-stopped
@@ -131,7 +121,7 @@ services:
       retries: 3
       start_period: 40s
 
-  # React Frontend (Nginx)
+  # React Frontend (Nginx )
   frontend:
     build:
       context: .
