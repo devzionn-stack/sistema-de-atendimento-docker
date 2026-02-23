@@ -24,7 +24,7 @@ services:
 
   # Redis Cache
   redis:
-    image: redis:7-alpine
+    image: redis:alpine
     container_name: sistema-atendimento-redis
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-changeme123}
     volumes:
@@ -32,56 +32,33 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
     networks:
       - app-network
     restart: unless-stopped
 
-  # Kafka
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: sistema-atendimento-kafka
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    depends_on:
-      - zookeeper
-    ports:
-      - "29092:29092"
-    healthcheck:
-      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  # Zookeeper
+  # Zookeeper (Bitnami - Mais leve e compatível)
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
+    image: bitnami/zookeeper:latest
     container_name: sistema-atendimento-zookeeper
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-    healthcheck:
-      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Kafka (Bitnami - Mais leve e compatível)
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: sistema-atendimento-kafka
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      - zookeeper
     networks:
       - app-network
     restart: unless-stopped
@@ -107,21 +84,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_healthy
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     networks:
       - app-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
-  # React Frontend (Nginx )
+  # React Frontend (Nginx)
   frontend:
     build:
       context: .
@@ -138,12 +107,6 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
 networks:
   app-network:
