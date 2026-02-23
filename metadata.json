@@ -1,0 +1,8 @@
+{
+  "name": "Remix: LangGraph WhatsApp Agent Dashboard",
+  "description": "A comprehensive management suite for the LangGraph-powered WhatsApp integration, featuring real-time conversation monitoring, AI-driven analytics, and interactive menu management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

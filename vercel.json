@@ -1,0 +1,29 @@
+
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "main.py",
+      "use": "@vercel/python",
+      "config": { "maxDuration": 30 }
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "main.py"
+    },
+    {
+      "src": "/ws/(.*)",
+      "dest": "main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "index.html"
+    }
+  ]
+}
