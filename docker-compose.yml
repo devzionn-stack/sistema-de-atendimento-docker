@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # PostgreSQL Database with pgvector extension
   postgres:
@@ -6,85 +8,31 @@ services:
     environment:
       POSTGRES_USER: ${DB_USER:-atendimento}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme123}
-      POSTGRES_DB: ${DB_NAME:-pizzaria_db}
+      POSTGRES_DB: ${DB_NAME:-atendimento_db} # Alterado de pizzaria_db para evitar confusão
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "5433:5432" # Mapeamento: Host 5433 -> Container 5432
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-atendimento} -d ${DB_NAME:-pizzaria_db}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  # Redis Cache
-  redis:
-    image: redis:alpine
-    container_name: sistema-atendimento-redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-changeme123}
-    volumes:
-      - redis_data:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-atendimento} -d ${DB_NAME:-atendimento_db}"]
+      interval: 5s
       timeout: 5s
       retries: 5
     networks:
       - app-network
     restart: unless-stopped
 
-  # Zookeeper (Versão estável fixada)
-  zookeeper:
-    image: bitnami/zookeeper:3.9
-    container_name: sistema-atendimento-zookeeper
-    environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  # Kafka (Versão estável e variáveis de listener corrigidas)
-  kafka:
-    image: bitnami/kafka:3.7
-    container_name: sistema-atendimento-kafka
-    environment:
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - ALLOW_PLAINTEXT_LISTENER=yes
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_NODE_ID=1
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-    depends_on:
-      - zookeeper
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  # FastAPI Backend
+  # Backend Service
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     container_name: sistema-atendimento-backend
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-atendimento}:${DB_PASSWORD:-changeme123}@postgres:5432/${DB_NAME:-pizzaria_db}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme123}@redis:6379/0
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      ENVIRONMENT: ${ENVIRONMENT:-production}
-      DEBUG: ${DEBUG:-false}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${DB_USER:-atendimento}:${DB_PASSWORD:-changeme123}@postgres:5432/${DB_NAME:-atendimento_db}
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,7 +41,7 @@ services:
       kafka:
         condition: service_started
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "8001:8000" # Mapeamento: Host 8001 -> Container 8000
     networks:
       - app-network
     restart: unless-stopped
@@ -105,16 +53,19 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: sistema-atendimento-frontend
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost}
-      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost}
+      # IMPORTANTE: O Frontend agora precisa apontar para a porta 8001 no IP da VPS
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8001}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       - backend
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "8080:80" # Mapeamento: Host 8080 -> Container 80
     networks:
       - app-network
     restart: unless-stopped
+
+  # ... (Manter aqui as definições de redis, kafka e zookeeper que já estão funcionando)
 
 networks:
   app-network:
@@ -122,6 +73,3 @@ networks:
 
 volumes:
   postgres_data:
-    driver: local
-  redis_data:
-    driver: local
