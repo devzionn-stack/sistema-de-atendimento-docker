@@ -78,6 +78,7 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+    # O backend continua expondo a porta 8001 normalmente para o servidor
     ports:
       - "8001:8000"
     networks:
@@ -96,15 +97,21 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       - backend
-    ports:
-      - "8080:80"
+    # 👇 MUDANÇA 1: Trocamos ports por expose para o Nginx Proxy assumir
+    expose:
+      - "80"
+    # 👇 MUDANÇA 2: O frontend agora participa de duas redes
     networks:
       - app-network
+      - rede-proxy
     restart: unless-stopped
 
 networks:
   app-network:
     driver: bridge
+  # 👇 MUDANÇA 3: Declaramos a rede do proxy
+  rede-proxy:
+    external: true
 
 volumes:
   postgres_data:
